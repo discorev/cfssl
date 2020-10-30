@@ -15,9 +15,8 @@ import (
 	"testing"
 	"time"
 
+	ct "github.com/google/certificate-transparency-go"
 	"golang.org/x/crypto/ocsp"
-
-	"github.com/google/certificate-transparency-go"
 )
 
 const (
@@ -499,6 +498,21 @@ func TestClientCertParams(t *testing.T) {
 	}
 	if cert == nil {
 		t.Fatal("cert not created")
+	}
+}
+
+func TestLoadPEMCertificate(t *testing.T) {
+	for _, testFile := range []string{testCertFile, testExtraWSCertFile, testSinglePKCS7} {
+		if _, err := LoadPEMCertificate(testFile); err != nil {
+			t.Log(testFile)
+			t.Fatal(err)
+		}
+	}
+	for _, testFile := range []string{testBundleFile, testMessedUpCertFile, testEmptyPKCS7PEM, testEmptyCertFile, testMultiplePKCS7} {
+		if _, err := LoadPEMCertificate(testFile); err == nil {
+			t.Log(testFile)
+			t.Fatal("Incorrect cert failed to raise error")
+		}
 	}
 }
 

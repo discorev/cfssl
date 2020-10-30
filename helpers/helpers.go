@@ -330,6 +330,19 @@ func ParseOneCertificateFromPEM(certsPEM []byte) ([]*x509.Certificate, []byte, e
 	return certs, rest, nil
 }
 
+// LoadPEMCertificate loads a PEM certificate from a file.
+func LoadPEMCertificate(certFile string) (*x509.Certificate, error) {
+	if certFile == "" {
+		return nil, nil
+	}
+	certFileBytes, err := ReadBytes(certFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return ParseCertificatePEM(certFileBytes)
+}
+
 // LoadPEMCertPool loads a pool of PEM certificates from file.
 func LoadPEMCertPool(certsFile string) (*x509.CertPool, error) {
 	if certsFile == "" {
