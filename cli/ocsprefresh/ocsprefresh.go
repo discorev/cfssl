@@ -45,6 +45,15 @@ func ocsprefreshMain(args []string, c cli.Config) error {
 		return errors.New("need CA certificate (provide with -ca)")
 	}
 
+	ca, err := helpers.LoadPEMCertificate(c.CAFile)
+	if err != nil {
+		log.Critical("Unable to parse CA certificate: ", err)
+		return err
+	}
+
+	// The CA certificate subject key id is the authority key id of the certs it sign
+	aki := hex.EncodeToString(ca.SubjectKeyId)
+
 	s, err := SignerFromConfig(c)
 	if err != nil {
 		log.Critical("Unable to create OCSP signer: ", err)
@@ -57,7 +66,7 @@ func ocsprefreshMain(args []string, c cli.Config) error {
 	}
 
 	dbAccessor := sql.NewAccessor(db)
-	certs, err := dbAccessor.GetUnexpiredCertificates()
+	certs, err := dbAccessor.GetUnexpiredCertificatesByAKI(aki)
 	if err != nil {
 		return err
 	}
