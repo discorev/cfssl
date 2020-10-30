@@ -120,14 +120,8 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
-		ocspRecord := certdb.OCSPRecord{
-			Serial: req.Serial,
-			AKI:    req.AKI,
-			Body:   string(ocspResponse),
-			Expiry: ocspParsed.NextUpdate,
-		}
-
-		if err = h.dbAccessor.InsertOCSP(ocspRecord); err != nil {
+		// Upsert the OCSP result to ensure if there is already a response in the database it also gets saved
+		if err = h.dbAccessor.UpsertOCSP(req.Serial, req.AKI, string(ocspResponse), ocspParsed.NextUpdate); err != nil {
 			return err
 		}
 	}
