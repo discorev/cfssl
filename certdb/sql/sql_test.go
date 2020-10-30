@@ -15,6 +15,7 @@ import (
 const (
 	sqliteDBFile = "../testdb/certstore_development.db"
 	fakeAKI      = "fake_aki"
+	secondaryAKI = "secondary_aki"
 )
 
 func TestNoDB(t *testing.T) {
@@ -52,6 +53,8 @@ func roughlySameTime(t1, t2 time.Time) bool {
 func testEverything(ta TestAccessor, t *testing.T) {
 	testInsertCertificateAndGetCertificate(ta, t)
 	testInsertCertificateAndGetUnexpiredCertificate(ta, t)
+	testInsertCertificateAndGetUnexpiredCertificateByAKI(ta, t)
+	testInsertMultipleCertificatesAndGetUnexpiredCertificateByAKI(ta, t)
 	testInsertCertificateAndGetUnexpiredCertificateNullCommonName(ta, t)
 	testUpdateCertificateAndGetCertificate(ta, t)
 	testInsertOCSPAndGetOCSP(ta, t)
@@ -154,6 +157,140 @@ func testInsertCertificateAndGetUnexpiredCertificate(ta TestAccessor, t *testing
 		t.Error("Should have 1 unexpired certificate record:", len(unexpired))
 	}
 }
+
+func testInsertCertificateAndGetUnexpiredCertificateByAKI(ta TestAccessor, t *testing.T) {
+	ta.Truncate()
+
+	expiry := time.Now().Add(time.Minute)
+	want := certdb.CertificateRecord{
+		PEM:    "fake cert data",
+		Serial: "fake serial 2",
+		AKI:    fakeAKI,
+		Status: "good",
+		Reason: 0,
+		Expiry: expiry,
+	}
+
+	if err := ta.Accessor.InsertCertificate(want); err != nil {
+		t.Fatal(err)
+	}
+
+	rets, err := ta.Accessor.GetCertificate(want.Serial, want.AKI)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(rets) != 1 {
+		t.Fatal("should return exactly one record")
+	}
+
+	got := rets[0]
+
+	// reflection comparison with zero time objects are not stable as it seems
+	if want.Serial != got.Serial || want.Status != got.Status ||
+		want.AKI != got.AKI || !got.RevokedAt.IsZero() ||
+		want.PEM != got.PEM || !roughlySameTime(got.Expiry, expiry) {
+		t.Errorf("want Certificate %+v, got %+v", want, got)
+	}
+
+	unexpired, err := ta.Accessor.GetUnexpiredCertificatesByAKI(want.AKI)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(unexpired) != 1 {
+		t.Error("Should have 1 unexpired certificate record:", len(unexpired))
+	}
+}
+
+func testInsertMultipleCertificatesAndGetUnexpiredCertificateByAKI(ta TestAccessor, t *testing.T) {
+	ta.Truncate()
+
+	expiry := time.Now().Add(time.Minute)
+	first := certdb.CertificateRecord{
+		PEM:    "fake cert data",
+		Serial: "fake serial 1",
+		AKI:    fakeAKI,
+		Status: "good",
+		Reason: 0,
+		Expiry: expiry,
+	}
+
+	if err := ta.Accessor.InsertCertificate(first); err != nil {
+		t.Fatal(err)
+	}
+
+	rets, err := ta.Accessor.GetCertificate(first.Serial, first.AKI)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(rets) != 1 {
+		t.Fatal("should return exactly one record")
+	}
+
+	got := rets[0]
+
+	// reflection comparison with zero time objects are not stable as it seems
+	if first.Serial != got.Serial || first.Status != got.Status ||
+		first.AKI != got.AKI || !got.RevokedAt.IsZero() ||
+		first.PEM != got.PEM || !roughlySameTime(got.Expiry, expiry) {
+		t.Errorf("want Certificate %+v, got %+v", first, got)
+	}
+
+	want := certdb.CertificateRecord{
+		PEM:    "fake cert data",
+		Serial: "fake serial 2",
+		AKI:    secondaryAKI,
+		Status: "good",
+		Reason: 0,
+		Expiry: expiry,
+	}
+
+	if err := ta.Accessor.InsertCertificate(want); err != nil {
+		t.Fatal(err)
+	}
+
+	rets, err = ta.Accessor.GetCertificate(want.Serial, want.AKI)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(rets) != 1 {
+		t.Fatal("should return exactly one record")
+	}
+
+	got = rets[0]
+
+	// reflection comparison with zero time objects are not stable as it seems
+	if want.Serial != got.Serial || want.Status != got.Status ||
+		want.AKI != got.AKI || !got.RevokedAt.IsZero() ||
+		want.PEM != got.PEM || !roughlySameTime(got.Expiry, expiry) {
+		t.Errorf("want Certificate %+v, got %+v", want, got)
+	}
+
+	unexpired, err := ta.Accessor.GetUnexpiredCertificates()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(unexpired) != 2 {
+		t.Error("Should have 2 unexpired certificate record:", len(unexpired))
+	}
+
+	unexpired, err = ta.Accessor.GetUnexpiredCertificatesByAKI(want.AKI)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(unexpired) != 1 {
+		t.Errorf("Should have 1 unexpired certificate record for AKI %v got %v", want.AKI, len(unexpired))
+	}
+}
+
 func testInsertCertificateAndGetUnexpiredCertificateNullCommonName(ta TestAccessor, t *testing.T) {
 	ta.Truncate()
 
